@@ -41,12 +41,7 @@ android {
 
     signingConfigs {
         // Create debug signing config if it doesn't exist
-        create("debug") {
-            storeFile = file("debug.keystore")
-            storePassword = "android"
-            keyAlias = "androiddebugkey"
-            keyPassword = "android"
-        }
+        maybeCreate("debug")
 
         if (keystorePropertiesFile.exists()) {
             create("release") {
