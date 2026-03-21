@@ -27,17 +27,20 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+        working-directory: ./simple_live_app
 
       - name: Build APK
         run: flutter build apk --release
+        working-directory: ./simple_live_app
 
       - name: Build Windows
         run: flutter build windows --release
+        working-directory: ./simple_live_app
 
       - name: Upload Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: release-builds
           path: |
-            build/app/outputs/flutter-apk/app-release.apk
-            build/windows/x64/runner/Release/
+            simple_live_app/build/app/outputs/flutter-apk/app-release.apk
+            simple_live_app/build/windows/x64/runner/Release/
