@@ -7,7 +7,7 @@
 <h2 align="center">Simple Live</h2>
 
 <p align="center">
-简简单单的看直播
+简简单单的看直播 
 </p>
 
 ![浅色模式](/assets/screenshot_light.jpg)
