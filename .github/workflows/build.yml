@@ -1,46 +1,41 @@
-name: Build App
+name: Build & Sign Android APK
+
 on:
-  workflow_dispatch: # 支持手动触发
   push:
-    tags:
-      - 'v*' # 当你推送到以 v 开头的标签时触发 (如 v1.0.0)
+    branches:
+      - main
+  pull_request:
 
 jobs:
   build:
-    name: Build APK and Windows
-    runs-on: windows-latest # 使用 Windows 虚拟机，这样可以同时打 Windows 和 Android 包
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: '17'
-
-      - name: Setup Flutter
+      - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          channel: 'stable'
+          channel: stable
 
       - name: Install dependencies
         run: flutter pub get
-        working-directory: ./simple_live_app
 
-      - name: Build APK
+      - name: Decode keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/mykeystore.jks
+
+      - name: Create key.properties
+        run: |
+          echo "storeFile=mykeystore.jks" > android/key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+
+      - name: Build Signed APK
         run: flutter build apk --release
-        working-directory: ./simple_live_app
 
-      - name: Build Windows
-        run: flutter build windows --release
-        working-directory: ./simple_live_app
-
-      - name: Upload Artifacts
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: release-builds
-          path: |
-            simple_live_app/build/app/outputs/flutter-apk/app-release.apk
-            simple_live_app/build/windows/x64/runner/Release/
+          name: app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
