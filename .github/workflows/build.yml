@@ -21,23 +21,27 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+        working-directory: simple_live_app
 
       - name: Decode keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/mykeystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > mykeystore.jks
+        working-directory: simple_live_app/android
 
       - name: Create key.properties
         run: |
-          echo "storeFile=mykeystore.jks" > android/key.properties
-          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> android/key.properties
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "storeFile=mykeystore.jks" > key.properties
+          echo "storePassword=${{ secrets.KEYSTORE_PASSWORD }}" >> key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> key.properties
+        working-directory: simple_live_app/android
 
       - name: Build Signed APK
         run: flutter build apk --release
+        working-directory: simple_live_app
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: app-release.apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: simple_live_app/build/app/outputs/flutter-apk/app-release.apk
