@@ -1,19 +1,40 @@
-name: Build & Sign Android APK
+name: Auto Sync Upstream & Build APK
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    branches:
-      - master
+  schedule:
+    # 每周五 北京时间16:00（UTC 08:00）自动触发，你可以调整分钟和小时
+    - cron: '0 8 * * 5'
+  workflow_dispatch: # 支持手动触发
 
 jobs:
-  build:
+  sync-and-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          # 允许推送
+          token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Set git config
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+      - name: Add upstream remote
+        run: |
+          git remote add upstream https://github.com/xiaoyaocz/dart_simple_live.git
+          git fetch upstream
+
+      - name: Merge upstream changes
+        run: |
+          git merge --allow-unrelated-histories --no-edit upstream/master || true
+
+      - name: Push merged changes to your repo
+        run: |
+          git push origin master
+
+      # 后面是原有的云端打包步骤
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
