@@ -123,9 +123,11 @@ jobs:
           $config = Get-Content $configPath -Raw
           # 更新签名配置，使用固定证书
           $config = $config -replace 'install_certificate: "false"', 'install_certificate: "true"'
-          $config = $config -replace 'certificate_path: ""', 'certificate_path: "..\..\SimpleLive_Fixed.pfx"'
-          $config = $config -replace 'certificate_password: ""', 'certificate_password: "${{ secrets.WINDOWS_PFX_PASSWORD }}"'
+          # 追加证书路径和密码（原文件没有这些字段）
+          $config += "`ncertificate_path: ..\\..\\SimpleLive_Fixed.pfx"
+          $config += "`ncertificate_password: ${{ secrets.WINDOWS_PFX_PASSWORD }}"
           $config | Set-Content $configPath -NoNewline
+          Write-Host "Updated config:"
           Get-Content $configPath
         shell: pwsh
 
