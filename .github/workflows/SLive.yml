@@ -110,6 +110,31 @@ jobs:
       - name: Install flutter_distributor
         run: dart pub global activate flutter_distributor
 
+      - name: Generate self-signed certificate
+        run: |
+          # 创建临时证书用于签名 MSIX
+          $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=SimpleLive, O=SimpleLive, C=CN" -KeyUsage DigitalSignature -FriendlyName "SimpleLive" -CertStoreLocation "Cert:\CurrentUser\My" -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          $certPassword = ConvertTo-SecureString -String "SimpleLive123" -Force -AsPlainText
+          Export-PfxCertificate -cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" -FilePath "${{ github.workspace }}\simple_live_app\windows\SimpleLive.pfx" -Password $certPassword
+          # 导出证书到本地存储以便安装
+          Export-Certificate -Cert "Cert:\CurrentUser\My\$($cert.Thumbprint)" -FilePath "${{ github.workspace }}\SimpleLive.cer"
+          # 保存证书信息
+          $cert.Thumbprint | Out-File -FilePath "${{ github.workspace }}\cert_thumbprint.txt"
+          "SimpleLive123" | Out-File -FilePath "${{ github.workspace }}\cert_password.txt"
+        shell: pwsh
+
+      - name: Update MSIX config for signing
+        run: |
+          $configPath = "${{ github.workspace }}\simple_live_app\windows\packaging\msix\make_config.yaml"
+          $config = Get-Content $configPath -Raw
+          # 更新签名配置
+          $config = $config -replace 'install_certificate: "false"', 'install_certificate: "true"'
+          $config = $config -replace 'certificate_path: ""', 'certificate_path: "..\..\SimpleLive.pfx"'
+          $config = $config -replace 'certificate_password: ""', 'certificate_password: "SimpleLive123"'
+          $config | Set-Content $configPath -NoNewline
+          Get-Content $configPath
+        shell: pwsh
+
       - name: Build Windows (MSIX + ZIP)
         run: |
           cd simple_live_app
@@ -128,4 +153,14 @@ jobs:
         with:
           name: windows-zip
           path: simple_live_app/build/dist/**/*.zip
+          retention-days: 90
+
+      - name: Upload certificate for installation
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-certificate
+          path: |
+            SimpleLive.cer
+            cert_thumbprint.txt
+            cert_password.txt
           retention-days: 90
