@@ -117,36 +117,46 @@ jobs:
           [System.IO.File]::WriteAllBytes("${{ github.workspace }}\simple_live_app\windows\SimpleLive_Fixed.pfx", $certBytes)
         shell: pwsh
 
-      - name: Update MSIX config for signing
-        run: |
-          $configPath = "${{ github.workspace }}\simple_live_app\windows\packaging\msix\make_config.yaml"
-          $config = Get-Content $configPath -Raw
-          # 启用证书安装，并使用绝对路径
-          $config = $config -replace 'install_certificate: "false"', 'install_certificate: "true"'
-          $certPath = "${{ github.workspace }}\simple_live_app\windows\SimpleLive_Fixed.pfx"
-          $config += "`ncertificate_path: $certPath"
-          $config += "`ncertificate_password: ${{ secrets.WINDOWS_PFX_PASSWORD }}"
-          $config | Set-Content $configPath -NoNewline
-          Write-Host "Updated config:"
-          Get-Content $configPath
-        shell: pwsh
-
-      - name: Build Windows (MSIX + ZIP)
+      - name: Build Windows (MSIX without signing)
         run: |
           cd simple_live_app
-          flutter_distributor package --platform windows --targets msix,zip --skip-clean
+          # 构建未签名的 MSIX
+          flutter_distributor package --platform windows --targets msix --skip-clean
         shell: pwsh
 
-      - name: Upload Windows MSIX to Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-msix
-          path: simple_live_app/build/dist/**/*.msix
-          retention-days: 90
+      - name: Sign MSIX with SignTool
+        run: |
+          # 找到 Windows SDK 中的 SignTool
+          $signTool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
+          if (-not (Test-Path $signTool)) {
+            # 尝试其他版本
+            $signTool = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | Select-Object -First 1).FullName
+          }
+          
+          Write-Host "Using SignTool: $signTool"
+          
+          # 找到生成的 MSIX 文件
+          $msixPath = Get-ChildItem -Path "simple_live_app\build\dist\*.msix" | Select-Object -First 1
+          
+          if ($msixPath) {
+            Write-Host "Found MSIX: $($msixPath.FullName)"
+            
+            # 使用 SignTool 签名 MSIX
+            & $signTool sign /f "${{ github.workspace }}\simple_live_app\windows\SimpleLive_Fixed.pfx" /p "${{ secrets.WINDOWS_PFX_PASSWORD }}" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $msixPath.FullName
+            
+            if ($LASTEXITCODE -eq 0) {
+              Write-Host "MSIX signed successfully!"
+            } else {
+              Write-Host "SignTool failed with exit code: $LASTEXITCODE"
+            }
+          } else {
+            Write-Host "No MSIX file found!"
+          }
+        shell: pwsh
 
-      - name: Upload Windows ZIP to Artifacts
+      - name: Upload Signed MSIX to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-zip
-          path: simple_live_app/build/dist/**/*.zip
+          name: windows-msix-signed
+          path: simple_live_app/build/dist/**/*.msix
           retention-days: 90
