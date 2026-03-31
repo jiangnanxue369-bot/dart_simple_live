@@ -123,11 +123,9 @@ jobs:
           $config = Get-Content $configPath -Raw
           # 更新签名配置，使用固定证书
           $config = $config -replace 'install_certificate: "false"', 'install_certificate: "true"'
-          # 追加证书路径和密码（原文件没有这些字段）
-          $config += "`ncertificate_path: ..\\..\\SimpleLive_Fixed.pfx"
-          $config += "`ncertificate_password: ${{ secrets.WINDOWS_PFX_PASSWORD }}"
+          $config = $config -replace 'certificate_path: ""', 'certificate_path: "..\..\SimpleLive_Fixed.pfx"'
+          $config = $config -replace 'certificate_password: ""', 'certificate_password: "${{ secrets.WINDOWS_PFX_PASSWORD }}"'
           $config | Set-Content $configPath -NoNewline
-          Write-Host "Updated config:"
           Get-Content $configPath
         shell: pwsh
 
@@ -135,8 +133,6 @@ jobs:
         run: |
           cd simple_live_app
           flutter_distributor package --platform windows --targets msix,zip --skip-clean
-          Write-Host "Build completed, checking output..."
-          Get-ChildItem -Path "build" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 20
         shell: pwsh
 
       - name: Upload Windows MSIX to Artifacts
@@ -145,7 +141,6 @@ jobs:
           name: windows-msix
           path: simple_live_app/build/dist/**/*.msix
           retention-days: 90
-          if-no-files-found: warn
 
       - name: Upload Windows ZIP to Artifacts
         uses: actions/upload-artifact@v4
@@ -153,4 +148,3 @@ jobs:
           name: windows-zip
           path: simple_live_app/build/dist/**/*.zip
           retention-days: 90
-          if-no-files-found: warn
