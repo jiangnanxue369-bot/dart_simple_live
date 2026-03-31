@@ -121,9 +121,10 @@ jobs:
         run: |
           $configPath = "${{ github.workspace }}\simple_live_app\windows\packaging\msix\make_config.yaml"
           $config = Get-Content $configPath -Raw
-          # 启用证书安装，并追加证书路径和密码（从 make_config.yaml 位置到证书的相对路径）
+          # 启用证书安装，并使用绝对路径
           $config = $config -replace 'install_certificate: "false"', 'install_certificate: "true"'
-          $config += "`ncertificate_path: ..\\SimpleLive_Fixed.pfx"
+          $certPath = "${{ github.workspace }}\simple_live_app\windows\SimpleLive_Fixed.pfx"
+          $config += "`ncertificate_path: $certPath"
           $config += "`ncertificate_password: ${{ secrets.WINDOWS_PFX_PASSWORD }}"
           $config | Set-Content $configPath -NoNewline
           Write-Host "Updated config:"
