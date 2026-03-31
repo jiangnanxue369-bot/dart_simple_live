@@ -85,7 +85,7 @@ jobs:
           path: simple_live_app/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 90
 
-  # 编译 Windows 版本
+  # 编译 Windows ZIP
   build-windows:
     runs-on: windows-latest
     needs: sync-upstream
@@ -107,56 +107,26 @@ jobs:
           cd simple_live_app
           flutter pub get
 
-      - name: Install flutter_distributor
-        run: dart pub global activate flutter_distributor
-
-      - name: Decode fixed certificate
-        run: |
-          # 从 Secrets 读取固定证书并解码
-          $certBytes = [System.Convert]::FromBase64String("${{ secrets.WINDOWS_PFX_BASE64 }}")
-          [System.IO.File]::WriteAllBytes("${{ github.workspace }}\simple_live_app\windows\SimpleLive_Fixed.pfx", $certBytes)
-        shell: pwsh
-
-      - name: Build Windows (MSIX without signing)
+      - name: Build Windows (Release)
         run: |
           cd simple_live_app
-          # 构建未签名的 MSIX
-          flutter_distributor package --platform windows --targets msix --skip-clean
+          flutter build windows --release
         shell: pwsh
 
-      - name: Sign MSIX with SignTool
+      - name: Create ZIP package
         run: |
-          # 找到 Windows SDK 中的 SignTool
-          $signTool = "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe"
-          if (-not (Test-Path $signTool)) {
-            # 尝试其他版本
-            $signTool = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter "signtool.exe" | Select-Object -First 1).FullName
-          }
-          
-          Write-Host "Using SignTool: $signTool"
-          
-          # 找到生成的 MSIX 文件
-          $msixPath = Get-ChildItem -Path "simple_live_app\build\dist\*.msix" | Select-Object -First 1
-          
-          if ($msixPath) {
-            Write-Host "Found MSIX: $($msixPath.FullName)"
-            
-            # 使用 SignTool 签名 MSIX
-            & $signTool sign /f "${{ github.workspace }}\simple_live_app\windows\SimpleLive_Fixed.pfx" /p "${{ secrets.WINDOWS_PFX_PASSWORD }}" /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $msixPath.FullName
-            
-            if ($LASTEXITCODE -eq 0) {
-              Write-Host "MSIX signed successfully!"
-            } else {
-              Write-Host "SignTool failed with exit code: $LASTEXITCODE"
-            }
-          } else {
-            Write-Host "No MSIX file found!"
-          }
+          cd simple_live_app
+          $version = (Get-Content pubspec.yaml | Select-String "version:").Line.Split(":")[1].Trim().Split("+")[0]
+          $outputDir = "build\windows\x64\runner\Release"
+          $zipName = "simple_live_app-${version}-windows.zip"
+          Compress-Archive -Path "$outputDir\*" -DestinationPath "build\$zipName" -Force
+          Write-Host "Created: build\$zipName"
+          Get-ChildItem build\*.zip
         shell: pwsh
 
-      - name: Upload Signed MSIX to Artifacts
+      - name: Upload Windows ZIP to Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: windows-msix-signed
-          path: simple_live_app/build/dist/**/*.msix
+          name: windows-zip
+          path: simple_live_app/build/*.zip
           retention-days: 90
